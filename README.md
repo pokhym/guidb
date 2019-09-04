@@ -14,3 +14,4 @@ In order to do this, a local SQLite3 database will be used to store all relevant
 * DB
   * Provide a way to automatically update entries if a file is moved or renamed (hashing?)
   * When using a custom constructor for columns/types need to make sure to do a type check to make sure input is correct
+  * Function to check for typeof() when either passing in initial columnTypeList or when adding a new column

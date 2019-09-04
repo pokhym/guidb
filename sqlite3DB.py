@@ -1,22 +1,23 @@
 import sqlite3
 import os
 
-DEFAULT_NAME_COLUMNTYPE = [("staff_number", "INTEGER PRIMARY KEY"),\
-("fname", "VARCHAR(20)"),\
-    ("lname", "VARCHAR(30)"),\
-        ("gender", "CHAR(1)"),\
-            ("joining", "DATE")
+DEFAULT_NAME_COLUMN_TYPE = [("staff_number", "INTEGER PRIMARY KEY", "integer"),\
+("fname", "VARCHAR(20)", "text"),\
+    ("lname", "VARCHAR(30)", "text"),\
+        ("gender", "CHAR(1)", "text"),\
+            ("joining", "DATE", "text")
 ]
 
 class sqlite3DB:
+    # TODO: The input of columnListType is user input and thus there needs to be a function
+    # which checks whether it is of the correct type using the sqlite3 function typeof()
+    # this function probably needs to exist in this class
     columnListType = []
+    conn = None
 
-    def __init__(self, columnListType=DEFAULT_NAME_COLUMNTYPE):
-        self.columnListType = columnListType
-
-    def initDB(self):
+    def __init__(self, columnListType=DEFAULT_NAME_COLUMN_TYPE):
         """
-            initDB
+            __init__
                 Inputs:
                     None
                 Output:
@@ -26,6 +27,8 @@ class sqlite3DB:
                     with default columns from createDefaultTable.  This function should be called
                     when the program is launched
         """
+        self.columnListType = columnListType
+
         exists = os.path.exists("./collections.db")
 
         if exists:
@@ -34,13 +37,12 @@ class sqlite3DB:
             print("Database doesn't Exist.")
 
         # connect to db
-        connection = sqlite3.connect("collections.db")
-        crsr = connection.cursor()
+        self.conn = self.createConnection("collections.db")
+
+        crsr = self.conn.cursor()
         
         # check if a table exists
-        sql_command = ''' SELECT count(name) FROM sqlite_master WHERE type='table' AND name='Entries' '''
-        crsr.execute(sql_command)
-        if crsr.fetchone()[0] == 1:
+        if self.tableExist("Entries"):
             print('Table exists.')
         # if it doesnt exist create the table
         else:
@@ -55,6 +57,23 @@ class sqlite3DB:
                 print("Failed to create new table!")
                 exit(-1)
 
+    def createConnection(self, dbFile):
+        """
+            createConnection
+                Inputs:
+                    dbFile: Database file path
+                Outputs:
+                    None
+                Description:
+                    Creates a connection to the database and returns the conn ob
+        """
+        conn = None
+        try:
+            conn = sqlite3.connect(dbFile)
+        except IOError as e:
+            print(e)
+        return conn
+    
     def parseNameColumnFromList(self, name_columntype):
         """
             parseNameColumnFromList
@@ -66,6 +85,7 @@ class sqlite3DB:
                 Description:
                     This function creates a string of <name> <type>, ..., <name> <type>
         """
+        # TODO: Change this to an if statement and a return gracefully
         assert len(name_columntype) >= 1
 
         nameColumnTypeStr = ""
@@ -90,13 +110,29 @@ class sqlite3DB:
         sql_command = "CREATE TABLE Entries (" + self.parseNameColumnFromList(self.columnListType) + ");"
         crsr.execute(sql_command)
 
-    def createConnection(self, dbFile):
-        conn = None
-        try:
-            conn = sqlite3.connect(dbFile)
-        except IOError as e:
-            print(e)
-        return conn
+    def tableExist(self, tableName):
+        """
+            tableExist
+                Inputs:
+                    tableName: A string which is the tableName we are checking for
+                Outputs:
+                    bool: True if table with tableName exists false o/w
+                Description:
+                    This function checks if a certain table exists in the database
+        """
+        crsr = self.conn.cursor()
+        sql_command = "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='" + tableName +"'"
+        crsr.execute(sql_command)
+        return crsr.fetchone()[0] == 1
 
-    # def createEntriesTable():
-    # 
+    def createNewEntryInTable(self, tableName, param):
+        """
+            createEntriesTable
+                inputs:
+                    tableName: The table which we want to modify
+                    param: A list of parameters for the table
+                Outputs:
+                    None
+                Description:
+                    Creates a new entry in the the table with tableName with parameters param
+        """
