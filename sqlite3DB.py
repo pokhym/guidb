@@ -1,7 +1,7 @@
 import sqlite3
 import os
 
-DEFAULT_NAME_COLUMN_TYPE = [("staff_number", "INTEGER PRIMARY KEY", "integer"),\
+DEFAULT_NAME_COLUMN_TYPE = [("staffnumber", "INTEGER PRIMARY KEY", "integer"),\
 ("fname", "VARCHAR(20)", "text"),\
     ("lname", "VARCHAR(30)", "text"),\
         ("gender", "CHAR(1)", "text"),\
@@ -12,6 +12,8 @@ class sqlite3DB:
     # TODO: The input of columnListType is user input and thus there needs to be a function
     # which checks whether it is of the correct type using the sqlite3 function typeof()
     # this function probably needs to exist in this class
+    # TODO: columnListType currently is set up for only one table. It might be produent to
+    # allow it to be used for multiple tables
     columnListType = []
     conn = None
 
@@ -74,6 +76,34 @@ class sqlite3DB:
             print(e)
         return conn
     
+    def closeConnection(self):
+        """
+            closeConnection
+                Inputs:
+                    None
+                Outputs:
+                    None
+                Description:
+                    Commits all pending transactions and then closes the connection
+        """
+        self.conn.commit()
+        self.conn.close()
+
+    def getAll_entries(self):
+        """
+            getAll_entries
+                Inputs:
+                    None
+                Outputs:
+                    None
+                Description:
+                    Hardcoded to print every entry from the table Entries
+        """
+        cur = self.conn.cursor()
+        with self.conn:
+            cur.execute("SELECT * FROM Entries")
+            print(cur.fetchall())
+    
     def parseNameColumnFromList(self, name_columntype):
         """
             parseNameColumnFromList
@@ -95,7 +125,28 @@ class sqlite3DB:
         # strip last comma
         nameColumnTypeStr = nameColumnTypeStr[:-1]
         return nameColumnTypeStr
+    
+    def parseNameFromList(self, name_columntype):
+        """
+            parseNameFromList
+                Inputs:
+                    name_columntype: name_columntype: A list of tuples, (name, type), which will be used to create comma sep
+                    list for use in a SQL command such as CREATE TABLE ___ (<return value here>));
+                Outputs:
+                    nameColumnTypeStr: A new string containing only the names of the columns
+                    in the table
+        """
+        # TODO: Change this to an if statement and a return gracefully
+        assert len(name_columntype) >= 1
 
+        nameColumnTypeStr = ""
+        for tup in name_columntype:
+            nameColumnTypeStr = nameColumnTypeStr + str(tup[0]) + ","
+        
+        # strip last comma
+        nameColumnTypeStr = nameColumnTypeStr[:-1]
+        return nameColumnTypeStr
+    
     def createDefaultTable(self, crsr):
         """
             createDefaultTable
@@ -135,4 +186,20 @@ class sqlite3DB:
                     None
                 Description:
                     Creates a new entry in the the table with tableName with parameters param
+        """
+        # TODO: Make sure this assert is turned into a graceful return condition
+        # assert len(param[0]) == len(self.columnListType)
+
+        # if len(param[0]) == len(self.columnListType):
+        sql_command = "INSERT INTO " + tableName + "(" + self.parseNameFromList(self.columnListType) + ") VALUES(" + "?," * (len(self.columnListType) - 1) + "?" + ");"
+        # fail condition
+        # else:
+            # return -1
+        print(sql_command)
+        crsr = self.conn.cursor()
+        crsr.execute(sql_command, param)
+        self.conn.commit()
+    
+    def updateEntryInTable(self, tableName):
+        """
         """
