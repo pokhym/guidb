@@ -14,14 +14,15 @@ class sqlite3DB:
     # this function probably needs to exist in this class
     # TODO: columnListType currently is set up for only one table. It might be produent to
     # allow it to be used for multiple tables
-    columnListType = []
+    dictColumnListType = {}
     conn = None
 
-    def __init__(self, columnListType=DEFAULT_NAME_COLUMN_TYPE):
+    def __init__(self, columnListType=DEFAULT_NAME_COLUMN_TYPE, tableName="Entries"):
         """
             __init__
                 Inputs:
-                    None
+                    columnListType: Contains the names of columns and their types
+                    tableName: A default table name to be used
                 Output:
                     None
                 Description:
@@ -29,14 +30,14 @@ class sqlite3DB:
                     with default columns from createDefaultTable.  This function should be called
                     when the program is launched
         """
-        self.columnListType = columnListType
+        self.dictColumnListType = {tableName: columnListType}
 
         exists = os.path.exists("./collections.db")
 
         if exists:
-            print("Database exists.")
+            print("[LOG] Database exists.")
         else:
-            print("Database doesn't Exist.")
+            print("[LOG] Database doesn't Exist.")
 
         # connect to db
         self.conn = self.createConnection("collections.db")
@@ -45,18 +46,18 @@ class sqlite3DB:
         
         # check if a table exists
         if self.tableExist("Entries"):
-            print('Table exists.')
+            print('[LOG] Table exists.')
         # if it doesnt exist create the table
         else:
-            print("Table does not exist, creating table.")
-            self.createDefaultTable(crsr)
+            print("[LOG] Table does not exist, creating table.")
+            self.createDefaultTable(crsr, tableName)
 
             sql_command = ''' SELECT count(name) FROM sqlite_master WHERE type='table' AND name='Entries' '''
             crsr.execute(sql_command)
             if crsr.fetchone()[0] == 1:
-                print('Table now exists.')
+                print('[LOG] Table now exists.')
             else:
-                print("Failed to create new table!")
+                print("[ERROR] Failed to create new table!")
                 exit(-1)
 
     def createConnection(self, dbFile):
@@ -73,7 +74,7 @@ class sqlite3DB:
         try:
             conn = sqlite3.connect(dbFile)
         except IOError as e:
-            print(e)
+            print("[ERROR] " + e)
         return conn
     
     def closeConnection(self):
@@ -133,7 +134,7 @@ class sqlite3DB:
                     name_columntype: name_columntype: A list of tuples, (name, type), which will be used to create comma sep
                     list for use in a SQL command such as CREATE TABLE ___ (<return value here>));
                 Outputs:
-                    nameColumnTypeStr: A new string containing only the names of the columns
+                    nameColumnTypeStr: A new string containing only the comma separated names of the columns
                     in the table
         """
         # TODO: Change this to an if statement and a return gracefully
@@ -147,7 +148,7 @@ class sqlite3DB:
         nameColumnTypeStr = nameColumnTypeStr[:-1]
         return nameColumnTypeStr
     
-    def createDefaultTable(self, crsr):
+    def createDefaultTable(self, crsr, tableName):
         """
             createDefaultTable
                 Inputs:
@@ -158,7 +159,7 @@ class sqlite3DB:
                     Creates and executes an sql command which creates a table called "Entries" with some
                     default columns.
         """
-        sql_command = "CREATE TABLE Entries (" + self.parseNameColumnFromList(self.columnListType) + ");"
+        sql_command = "CREATE TABLE Entries (" + self.parseNameColumnFromList(self.dictColumnListType[tableName]) + ");"
         crsr.execute(sql_command)
 
     def tableExist(self, tableName):
@@ -183,23 +184,102 @@ class sqlite3DB:
                     tableName: The table which we want to modify
                     param: A list of parameters for the table
                 Outputs:
-                    None
+                    boolean: False if creation of new entry failed, True if succeeded
                 Description:
                     Creates a new entry in the the table with tableName with parameters param
         """
         # TODO: Make sure this assert is turned into a graceful return condition
-        # assert len(param[0]) == len(self.columnListType)
+        assert len(param) == len(self.dictColumnListType[tableName])
 
-        # if len(param[0]) == len(self.columnListType):
-        sql_command = "INSERT INTO " + tableName + "(" + self.parseNameFromList(self.columnListType) + ") VALUES(" + "?," * (len(self.columnListType) - 1) + "?" + ");"
+        # https://stackoverflow.com/questions/2440147/how-to-check-the-existence-of-a-row-in-sqlite-with-python
+        crsr = self.conn.cursor()
+        crsr.execute("SELECT " + self.dictColumnListType[tableName][0][0] + \
+            " FROM " + tableName + " WHERE " + self.dictColumnListType[tableName][0][0] + " = ?", [param[0]])
+        data = crsr.fetchone()
+        if data is None:
+            print("[LOG] Creating entry.")
+        else:
+            print("[LOG] Entry already exists.")
+            return False
+
+        if len(param) == len(self.dictColumnListType[tableName]):
+            sql_command = "INSERT INTO " + tableName + "(" + self.parseNameFromList(self.dictColumnListType[tableName]) + \
+                ") VALUES(" + "?," * (len(self.dictColumnListType[tableName]) - 1) + "?" + ");"
         # fail condition
-        # else:
-            # return -1
-        print(sql_command)
+        else:
+            print("[ERROR] Failed to update entry in table due to mismatch in # columns: " + tableName)
+            return False
         crsr = self.conn.cursor()
         crsr.execute(sql_command, param)
         self.conn.commit()
+        return True
+
+    def parseNameUpdateCommand(self, namestr):
+        """
+            parseNameUpdateCommand
+                Inputs:
+                Outputs:
+        """
+        outputStr = ""
+        arrayOfNames = namestr.split(",")
+        arrayOfNames = namestr[1:] # get rid of the primary key
+        # build new string
+        for name in arrayOfNames:
+            outputStr = outputStr + name + "=?,"
+        outputStr = outputStr[:-1]
+        return outputStr
     
-    def updateEntryInTable(self, tableName):
+    def updateEntryInTable(self, tableName, primaryKey, param, name):
         """
+            updateEntryInTable
+                Inputs:
+                    tableName: table name to be updated
+                    primaryKey: The primary key of the row we want to edit
+                    param: List of parameters to be updated in the row
+                    name: The list of the columns that we want to update parameters in
+                Outputs:
+                    boolean: False if update failed, True if succeeded
+                Description:
+                    Updates a specific entry in the table
         """
+        # TODO: Make sure errors are gracefully handled in GUI
+
+        # make sure primary key exists
+        # https://stackoverflow.com/questions/2440147/how-to-check-the-existence-of-a-row-in-sqlite-with-python
+        crsr = self.conn.cursor()
+        crsr.execute("SELECT " + self.dictColumnListType[tableName][0][0] + \
+            " FROM " + tableName + " WHERE " + self.dictColumnListType[tableName][0][0] + " = ?", [primaryKey])
+        data = crsr.fetchone()
+        if data is None:
+            print("[LOG] Entry does not exist.")
+            return False
+        else:
+            print("[LOG] Entry already exists.")
+
+        # Make sure our names exist in the table's columns
+        count = 0
+        for n in name:
+            for column in self.dictColumnListType[tableName]:
+                if column[0] == n and self.dictColumnListType[tableName][0][0] == n:
+                    print("[ERROR] You are trying to edit the primary key column.")
+                    return False
+                if column[0] == n:
+                    count = count + 1
+        if count == len(name):
+            print("[LOG] All columns to be edited exist.")
+        else:
+            print("[ERROR] Some input columns do not exist.")
+            return False
+
+
+        if len(param) <= len(self.dictColumnListType[tableName]):
+            namestr = self.parseNameFromList(self.dictColumnListType[tableName])
+            print(self.parseNameUpdateCommand(namestr))
+            sql_command = "UPDATE " + tableName + " SET " + self.parseNameUpdateCommand(namestr) + ";"
+        else:
+            print("[ERROR] Failed to update entry in table due to mismatch in # columns: " + tableName)
+            return False
+        crsr = self.conn.cursor()
+        crsr.execute(sql_command, param)
+        self.conn.commit()
+        return True

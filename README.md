@@ -13,5 +13,8 @@ In order to do this, a local SQLite3 database will be used to store all relevant
 
 * DB
   * Provide a way to automatically update entries if a file is moved or renamed (hashing?)
-  * When using a custom constructor for columns/types need to make sure to do a type check to make sure input is correct
   * Function to check for typeof() when either passing in initial columnTypeList or when adding a new column
+  * Fix the asserts so that when you incorrectly pass in parameters the GUI will raise an error
+  * When adding columns need to initialize each column to a specific value
+  * When adding entries need to check that entries do not exist
+  * Unique Column Names
