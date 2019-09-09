@@ -35,9 +35,9 @@ class sqlite3DB:
         exists = os.path.exists("./collections.db")
 
         if exists:
-            print("[LOG] Database exists.")
+            print("[LOG] (init) Database exists.")
         else:
-            print("[LOG] Database doesn't Exist.")
+            print("[LOG] (init) Database doesn't Exist.")
 
         # connect to db
         self.conn = self.createConnection("collections.db")
@@ -46,18 +46,18 @@ class sqlite3DB:
         
         # check if a table exists
         if self.tableExist("Entries"):
-            print('[LOG] Table exists.')
+            print('[LOG] (init) Table exists.')
         # if it doesnt exist create the table
         else:
-            print("[LOG] Table does not exist, creating table.")
+            print("[LOG] (init) Table does not exist, creating table.")
             self.createDefaultTable(crsr, tableName)
 
             sql_command = ''' SELECT count(name) FROM sqlite_master WHERE type='table' AND name='Entries' '''
             crsr.execute(sql_command)
             if crsr.fetchone()[0] == 1:
-                print('[LOG] Table now exists.')
+                print('[LOG] (init) Table now exists.')
             else:
-                print("[ERROR] Failed to create new table!")
+                print("[ERROR] (init) Failed to create new table!")
                 exit(-1)
 
     def createConnection(self, dbFile):
@@ -197,9 +197,9 @@ class sqlite3DB:
             " FROM " + tableName + " WHERE " + self.dictColumnListType[tableName][0][0] + " = ?", [param[0]])
         data = crsr.fetchone()
         if data is None:
-            print("[LOG] Creating entry.")
+            print("[LOG] (createNewEntryInTable) Creating entry.")
         else:
-            print("[LOG] Entry already exists.")
+            print("[LOG] (createNewEntryInTable) Entry already exists.")
             return False
 
         if len(param) == len(self.dictColumnListType[tableName]):
@@ -207,22 +207,25 @@ class sqlite3DB:
                 ") VALUES(" + "?," * (len(self.dictColumnListType[tableName]) - 1) + "?" + ");"
         # fail condition
         else:
-            print("[ERROR] Failed to update entry in table due to mismatch in # columns: " + tableName)
+            print("[ERROR] (createNewEntryInTable) Failed to update entry in table due to mismatch in # columns: " + tableName)
             return False
         crsr = self.conn.cursor()
         crsr.execute(sql_command, param)
         self.conn.commit()
         return True
 
-    def parseNameUpdateCommand(self, namestr):
+    def parseNameUpdateCommand(self, namelist):
         """
             parseNameUpdateCommand
                 Inputs:
+                    namelist: List of names (columns) we want to update
                 Outputs:
+                    A comma separated list of "name=?"
+                Description:
+                    This function creates an output string of columns with =?
         """
         outputStr = ""
-        arrayOfNames = namestr.split(",")
-        arrayOfNames = namestr[1:] # get rid of the primary key
+        arrayOfNames = namelist
         # build new string
         for name in arrayOfNames:
             outputStr = outputStr + name + "=?,"
@@ -251,33 +254,31 @@ class sqlite3DB:
             " FROM " + tableName + " WHERE " + self.dictColumnListType[tableName][0][0] + " = ?", [primaryKey])
         data = crsr.fetchone()
         if data is None:
-            print("[LOG] Entry does not exist.")
+            print("[LOG] (updateEntryInTable) Entry does not exist.")
             return False
         else:
-            print("[LOG] Entry already exists.")
+            print("[LOG] (updateEntryInTable) Entry already exists.")
 
         # Make sure our names exist in the table's columns
         count = 0
         for n in name:
             for column in self.dictColumnListType[tableName]:
                 if column[0] == n and self.dictColumnListType[tableName][0][0] == n:
-                    print("[ERROR] You are trying to edit the primary key column.")
+                    print("[ERROR] (updateEntryInTable) You are trying to edit the primary key column.")
                     return False
                 if column[0] == n:
                     count = count + 1
         if count == len(name):
-            print("[LOG] All columns to be edited exist.")
+            print("[LOG] (updateEntryInTable) All columns to be edited exist.")
         else:
-            print("[ERROR] Some input columns do not exist.")
+            print("[ERROR] (updateEntryInTable) Some input columns do not exist.")
             return False
 
 
         if len(param) <= len(self.dictColumnListType[tableName]):
-            namestr = self.parseNameFromList(self.dictColumnListType[tableName])
-            print(self.parseNameUpdateCommand(namestr))
-            sql_command = "UPDATE " + tableName + " SET " + self.parseNameUpdateCommand(namestr) + ";"
+            sql_command = "UPDATE " + tableName + " SET " + self.parseNameUpdateCommand(name) + " WHERE " + self.dictColumnListType[tableName][0][0] + " = " + str(primaryKey) + ";"
         else:
-            print("[ERROR] Failed to update entry in table due to mismatch in # columns: " + tableName)
+            print("[ERROR] (updateEntryInTable) Failed to update entry in table due to mismatch in # columns: " + tableName)
             return False
         crsr = self.conn.cursor()
         crsr.execute(sql_command, param)
