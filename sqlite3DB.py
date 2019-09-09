@@ -185,6 +185,9 @@ class sqlite3DB:
                     param: A list of parameters for the table
                 Outputs:
                     boolean: False if creation of new entry failed, True if succeeded
+                    -1: Entry already exists
+                    -2: Mismatch in # columns
+                    0: Success
                 Description:
                     Creates a new entry in the the table with tableName with parameters param
         """
@@ -200,7 +203,7 @@ class sqlite3DB:
             print("[LOG] (createNewEntryInTable) Creating entry.")
         else:
             print("[LOG] (createNewEntryInTable) Entry already exists.")
-            return False
+            return -1 
 
         if len(param) == len(self.dictColumnListType[tableName]):
             sql_command = "INSERT INTO " + tableName + "(" + self.parseNameFromList(self.dictColumnListType[tableName]) + \
@@ -208,11 +211,11 @@ class sqlite3DB:
         # fail condition
         else:
             print("[ERROR] (createNewEntryInTable) Failed to update entry in table due to mismatch in # columns: " + tableName)
-            return False
+            return -2
         crsr = self.conn.cursor()
         crsr.execute(sql_command, param)
         self.conn.commit()
-        return True
+        return 0
 
     def parseNameUpdateCommand(self, namelist):
         """
@@ -242,6 +245,10 @@ class sqlite3DB:
                     name: The list of the columns that we want to update parameters in
                 Outputs:
                     boolean: False if update failed, True if succeeded
+                    -1: Entry does not exist
+                    -2: Some input columns in input do not exist in table
+                    -3: Mismatch in # of columns
+                    0: Success
                 Description:
                     Updates a specific entry in the table
         """
@@ -255,7 +262,7 @@ class sqlite3DB:
         data = crsr.fetchone()
         if data is None:
             print("[LOG] (updateEntryInTable) Entry does not exist.")
-            return False
+            return -1
         else:
             print("[LOG] (updateEntryInTable) Entry already exists.")
 
@@ -272,15 +279,26 @@ class sqlite3DB:
             print("[LOG] (updateEntryInTable) All columns to be edited exist.")
         else:
             print("[ERROR] (updateEntryInTable) Some input columns do not exist.")
-            return False
+            return -2
 
 
         if len(param) <= len(self.dictColumnListType[tableName]):
             sql_command = "UPDATE " + tableName + " SET " + self.parseNameUpdateCommand(name) + " WHERE " + self.dictColumnListType[tableName][0][0] + " = " + str(primaryKey) + ";"
         else:
             print("[ERROR] (updateEntryInTable) Failed to update entry in table due to mismatch in # columns: " + tableName)
-            return False
+            return -3
         crsr = self.conn.cursor()
         crsr.execute(sql_command, param)
         self.conn.commit()
-        return True
+        return 0
+    
+    def removeEntryInTable(self, tableName, primaryKey):
+        """
+            removeEntryIntable
+                Inputs:
+                    tableName:
+                    primaryKey:
+                Outputs:
+                    Boolean: False if remove failed to remove true if remove
+                Description:
+        """
