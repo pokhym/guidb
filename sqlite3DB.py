@@ -105,6 +105,11 @@ class sqlite3DB:
             cur.execute("SELECT * FROM Entries")
             print(cur.fetchall())
     
+    def getEntryInTable(self):
+        """
+            #TODO: NEED TO FINISH
+        """
+
     def parseNameColumnFromList(self, name_columntype):
         """
             parseNameColumnFromList
@@ -187,10 +192,15 @@ class sqlite3DB:
                     boolean: False if creation of new entry failed, True if succeeded
                     -1: Entry already exists
                     -2: Mismatch in # columns
+                    -3: Table does not exist
                     0: Success
                 Description:
                     Creates a new entry in the the table with tableName with parameters param
         """
+        if self.tableExist(tableName) == False:
+            print("[ERROR] (createNewEntryInTable) Table does not exist")
+            return -4
+        
         # TODO: Make sure this assert is turned into a graceful return condition
         assert len(param) == len(self.dictColumnListType[tableName])
 
@@ -248,11 +258,16 @@ class sqlite3DB:
                     -1: Entry does not exist
                     -2: Some input columns in input do not exist in table
                     -3: Mismatch in # of columns
+                    -4: Table Does not exist
                     0: Success
                 Description:
                     Updates a specific entry in the table
         """
         # TODO: Make sure errors are gracefully handled in GUI
+
+        if self.tableExist(tableName) == False:
+            print("[ERROR] (updateEntryInTable) Table does not exist")
+            return -4
 
         # make sure primary key exists
         # https://stackoverflow.com/questions/2440147/how-to-check-the-existence-of-a-row-in-sqlite-with-python
@@ -299,6 +314,31 @@ class sqlite3DB:
                     tableName:
                     primaryKey:
                 Outputs:
-                    Boolean: False if remove failed to remove true if remove
+                    0: Remove worked
+                    -1: Table does not exist
+                    -2: Remove failed due to an entry not existing in table
                 Description:
+                    This function removes an entry in the table if it exists
         """
+        # TODO: Make sure errors are gracefully handled in GUI
+        if self.tableExist(tableName) == False:
+            print("[ERROR] (removeEntryInTable) Table does not exist")
+            return -1
+        
+        # make sure primary key exists
+        # https://stackoverflow.com/questions/2440147/how-to-check-the-existence-of-a-row-in-sqlite-with-python
+        crsr = self.conn.cursor()
+        crsr.execute("SELECT " + self.dictColumnListType[tableName][0][0] + \
+            " FROM " + tableName + " WHERE " + self.dictColumnListType[tableName][0][0] + " = ?", [primaryKey])
+        data = crsr.fetchone()
+        if data is None:
+            print("[LOG] (removeEntryInTable) Entry does not exist.")
+            return -2
+        else:
+            print("[LOG] (removeEntryInTable) Entry exists.")
+
+        sql_command = "DELETE FROM " + tableName + " WHERE id=?"
+
+        crsr.execute(sql_command)
+        self.conn.commit()
+        return 0
